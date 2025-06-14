@@ -1,7 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../config';
+import { User } from '../types/user';
+
+// Storage keys
+const AUTH_TOKEN_KEY = 'authToken';
+const USER_ID_KEY = 'userId';
 
 // Update this URL to match your actual backend server
-const API_URL = 'http://10.0.2.2:3000/api/auth'; // For Android emulator
+// const API_URL = 'http://10.0.2.2:3000/api/auth'; // For Android emulator
 // const API_URL = 'http://localhost:3000/api/auth'; // For iOS simulator
 // const API_URL = 'http://YOUR_ACTUAL_IP:3000/api/auth'; // For physical device
 
@@ -18,202 +24,234 @@ export interface User {
   is_volunteer?: boolean;
 }
 
-export const signup = async (userData: any) => {
-  try {
-    // Transform the data to match backend expectations
-    const formattedData = {
-      email: userData.email,
-      username: userData.username,
-      full_name: userData.full_name || userData.fullName,
-      phone_number: userData.phone_number || userData.phoneNumber,
-      emergency_number: userData.emergency_number || userData.emergencyNumber || null,
-      district: userData.district,
-      current_location: userData.current_location || userData.currentLocation,
-      blood_group: userData.blood_group || userData.bloodGroup || null,
-      password: userData.password,
-      is_volunteer: userData.is_volunteer || userData.isVolunteer || false
-    };
+export interface LoginResponse {
+  user: User;
+  token: string;
+  message: string;
+}
 
-    console.log('Attempting signup with:', API_URL);
-    console.log('User data:', { ...formattedData, password: '***' });
+export interface SignupData {
+  email: string;
+  username: string;
+  full_name: string;
+  phone_number: string;
+  password: string;
+  program?: string;
+}
 
-    const response = await fetch(`${API_URL}/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(formattedData),
-    });
-
-    console.log('Response status:', response.status);
-    const data = await response.json();
-    console.log('Response data:', data);
-
-    if (!response.ok) {
-      if (data.error === 'User already exists') {
-        throw new Error('An account with this email already exists');
-      } else if (data.error === 'Missing required fields') {
-        throw new Error('Please fill in all required fields');
-      } else if (data.details) {
-        throw new Error(data.details);
-      } else {
-        throw new Error(data.error || 'Signup failed. Please try again.');
-      }
-    }
-
-    return data;
-  } catch (error: any) {
-    console.error('Signup error:', error);
-    if (error.message === 'Network request failed') {
-      throw new Error('Cannot connect to server. Please check your internet connection and try again.');
-    }
-    throw error;
-  }
+// Test account credentials
+const TEST_ACCOUNT = {
+  email: 'test@gmail.com',
+  password: 'test@123',
+  user: {
+    id: 999,
+    email: 'test@gmail.com',
+    username: 'testuser',
+    full_name: 'Test User',
+    phone_number: '9841234567',
+    district: 'Kathmandu',
+    current_location: 'Kathmandu',
+    blood_group: 'O+',
+    is_volunteer: false,
+  },
+  token: 'test_token_123456789'
 };
 
-export const login = async (email: string, password: string) => {
-  try {
-    // Hardcoded credentials for testing
-    if (email === 'test@gmail.com' && password === '000000') {
-      console.log('Auth Debug - Using test credentials');
-      const mockUserData = {
-        user: {
-          id: 1,
-          email: 'test@gmail.com',
-          username: 'testuser',
-          full_name: 'Test User',
-          phone_number: '9860651033',
-          district: 'Kathmandu',
-          is_volunteer: false
+export const authService = {
+  signup: async (userData: SignupData): Promise<LoginResponse> => {
+    try {
+      console.log('Auth Debug - Attempting signup');
+      const response = await fetch(`${API_URL}/api/auth/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        token: 'mock_token_for_testing',
+        body: JSON.stringify(userData),
+      });
+
+      const data = await response.json();
+      console.log('Auth Debug - Signup response:', { status: response.status, success: response.ok });
+
+      if (!response.ok) {
+        if (data.error === 'Email already exists') {
+          throw new Error('An account with this email already exists');
+        } else if (data.error === 'Invalid email format') {
+          throw new Error('Please enter a valid email address');
+        } else if (data.error === 'Invalid phone number format') {
+          throw new Error('Please enter a valid Nepali phone number');
+        } else if (data.error === 'Password must be at least 8 characters long') {
+          throw new Error('Password must be at least 8 characters long');
+        } else if (data.details) {
+          throw new Error(data.details);
+        } else {
+          throw new Error(data.error || 'Signup failed. Please try again.');
+        }
+      }
+
+      return {
+        user: data.user,
+        token: data.token,
+        message: 'Signup successful'
+      };
+    } catch (error: any) {
+      console.error('Auth Debug - Signup error:', error);
+      if (error.message === 'Network request failed') {
+        throw new Error('Cannot connect to server. Please check your internet connection and try again.');
+      }
+      throw error;
+    }
+  },
+
+  login: async (identifier: string, password: string): Promise<LoginResponse> => {
+    try {
+      console.log('Auth Debug - Attempting login');
+      
+      // Check for test account
+      if (identifier === TEST_ACCOUNT.email && password === TEST_ACCOUNT.password) {
+        console.log('Auth Debug - Test account login successful');
+        // Save auth state for test account
+        await Promise.all([
+          AsyncStorage.setItem(AUTH_TOKEN_KEY, TEST_ACCOUNT.token),
+          AsyncStorage.setItem(USER_ID_KEY, String(TEST_ACCOUNT.user.id))
+        ]);
+
+        return {
+          user: TEST_ACCOUNT.user,
+          token: TEST_ACCOUNT.token,
+          message: 'Login successful'
+        };
+      }
+
+      // Regular login flow for other accounts
+      const loginUrl = `${API_URL}/api/auth/login`;
+      
+      const response = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ email: identifier, password }),
+      });
+
+      console.log('Auth Debug - Login response:', { status: response.status, success: response.ok });
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.error === 'Invalid email or password') {
+          throw new Error('Invalid email or password');
+        } else if (data.error === 'Email and password are required') {
+          throw new Error('Please enter your email and password');
+        } else {
+          throw new Error(data.error || 'Login failed. Please try again.');
+        }
+      }
+
+      // Save auth state immediately after successful login
+      console.log('Auth Debug - Saving auth state after login');
+      await Promise.all([
+        AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token),
+        AsyncStorage.setItem(USER_ID_KEY, String(data.user.id))
+      ]);
+
+      return {
+        user: data.user,
+        token: data.token,
         message: 'Login successful'
       };
-
-      console.log('Auth Debug - Storing test user data');
-      // Store user data in AsyncStorage
-      await AsyncStorage.setItem('userId', String(mockUserData.user.id));
-      await AsyncStorage.setItem('token', mockUserData.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(mockUserData.user));
-
-      console.log('Auth Debug - Test user data stored');
-      return mockUserData;
-    }
-
-    console.log('Attempting login with:', API_URL);
-    const response = await fetch(`${API_URL}/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-
-    console.log('Response status:', response.status);
-    const data = await response.json();
-    console.log('Response data:', data);
-
-    if (!response.ok) {
-      if (data.error === 'Invalid credentials') {
-        throw new Error('Invalid email or password');
-      } else if (data.details) {
-        throw new Error(data.details);
-      } else {
-        throw new Error(data.error || 'Login failed. Please try again.');
+    } catch (error: any) {
+      console.error('Auth Debug - Login error:', error);
+      // Clear any partial auth state on error
+      await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_ID_KEY]);
+      if (error.message === 'Network request failed') {
+        throw new Error('Cannot connect to server. Please check your internet connection and try again.');
       }
+      throw error;
     }
+  },
 
-    console.log('Auth Debug - Storing user data from backend');
-    // Store user data in AsyncStorage
-    await AsyncStorage.setItem('userId', String(data.user.id));
-    await AsyncStorage.setItem('token', data.token);
-    await AsyncStorage.setItem('userData', JSON.stringify(data.user));
+  getCurrentUser: async (): Promise<User | null> => {
+    try {
+      console.log('Auth Debug - Getting current user');
+      const [userId, token] = await Promise.all([
+        AsyncStorage.getItem(USER_ID_KEY),
+        AsyncStorage.getItem(AUTH_TOKEN_KEY)
+      ]);
+      
+      console.log('Auth Debug - Stored auth state:', { userId: !!userId, token: !!token });
+      
+      if (!userId || !token) {
+        console.log('Auth Debug - No user ID or token found');
+        return null;
+      }
 
-    console.log('Auth Debug - User data stored successfully');
-    return data;
-  } catch (error: any) {
-    console.error('Login error:', error);
-    if (error.message === 'Network request failed') {
-      throw new Error('Cannot connect to server. Please check your internet connection and try again.');
-    }
-    throw error;
-  }
-};
+      // Check if it's the test account
+      if (userId === String(TEST_ACCOUNT.user.id) && token === TEST_ACCOUNT.token) {
+        console.log('Auth Debug - Returning test account user data');
+        return TEST_ACCOUNT.user;
+      }
 
-export const logout = async () => {
-  try {
-    await AsyncStorage.removeItem('userId');
-    await AsyncStorage.removeItem('token');
-  } catch (error) {
-    console.error('Error during logout:', error);
-    throw error;
-  }
-};
+      // Regular user data fetch for other accounts
+      console.log('Auth Debug - Fetching user data from backend');
+      const response = await fetch(`${API_URL}/api/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
 
-export const getCurrentUser = async (): Promise<User | null> => {
-  try {
-    const userId = await AsyncStorage.getItem('userId');
-    const token = await AsyncStorage.getItem('token');
-    
-    console.log('Auth Debug - Stored User ID:', userId);
-    console.log('Auth Debug - Token exists:', !!token);
-    
-    if (!userId || !token) {
-      console.log('Auth Debug - No user ID or token found');
+      console.log('Auth Debug - User data response:', { status: response.status, success: response.ok });
+
+      if (response.status === 401 || response.status === 403) {
+        console.log('Auth Debug - Token invalid, expired, or insufficient permissions');
+        if (response.status === 401) {
+          await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_ID_KEY]);
+        }
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user data');
+      }
+
+      const userData = await response.json();
+      console.log('Auth Debug - User data loaded successfully');
+      return userData;
+    } catch (error) {
+      console.error('Auth Debug - Error getting current user:', error);
+      if (error instanceof Error && 
+          (error.message === 'Network request failed' || 
+           error.message.includes('permission'))) {
+        return null;
+      }
+      await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_ID_KEY]);
       return null;
     }
+  },
 
-    // For testing, return mock user data
-    if (userId === '1') {
-      console.log('Auth Debug - Using mock user data for test user');
-      const mockUser = {
-        id: 1,
-        email: 'test@gmail.com',
-        username: 'testuser',
-        full_name: 'Test User',
-        phone_number: '9860651033',
-        district: 'Kathmandu',
-        is_volunteer: false
-      };
-      console.log('Auth Debug - Mock user data:', mockUser);
-      return mockUser;
+  logout: async () => {
+    try {
+      console.log('Auth Debug - Logging out');
+      await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, USER_ID_KEY]);
+      console.log('Auth Debug - Auth state cleared');
+    } catch (error) {
+      console.error('Auth Debug - Error during logout:', error);
+      throw error;
     }
+  },
 
-    console.log('Auth Debug - Fetching user data from backend for ID:', userId);
-    // In a real app, fetch user data from the backend
-    const response = await fetch(`${API_URL}/users/${userId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.log('Auth Debug - Failed to fetch user data:', response.status);
-      throw new Error('Failed to fetch user data');
+  getToken: async (): Promise<string | null> => {
+    try {
+      console.log('Auth Debug - Getting token');
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      console.log('Auth Debug - Token exists:', !!token);
+      return token;
+    } catch (error) {
+      console.error('Auth Debug - Error getting token:', error);
+      return null;
     }
-
-    const userData = await response.json();
-    console.log('Auth Debug - User data from backend:', userData);
-    return userData;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-export const getToken = async (): Promise<string | null> => {
-  return AsyncStorage.getItem('token');
-};
-
-const authService = {
-  signup,
-  login,
-  logout,
-  getCurrentUser,
-  getToken
+  },
 };
 
 export default authService; 

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "NepalDisasterManagement",
-    "slug": "NepalDisasterManagement",
+    "name": "NoteBazaar",
+    "slug": "NoteBazaar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "nepaldisastermanagement",
+    "scheme": "notebazaar",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
@@ -17,7 +17,7 @@
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "pan",
-      "package": "com.anikesh1.NepalDisasterManagement",
+      "package": "com.anikesh99996.notebazaar",
       "navigationBar": {
         "visible": "immersive",
         "backgroundColor": "#ffffff"
@@ -33,15 +33,16 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/icon.png",
-          "imageWidth": 160,
-          "imageHeight": 160,
+          "image": "./assets/images/note.png",
+          "imageWidth": 200,
+          "imageHeight": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
       ],
       "expo-system-ui",
-      "expo-navigation-bar"
+      "expo-navigation-bar",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true
@@ -49,8 +50,10 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d115e6e8-100f-4e40-aad7-aea97086f74f"
-      }
-    }
+        "projectId": "88b5b01b-842a-4267-8a00-d0a7ded6f9c6"
+      },
+      "expo-navigation-bar": {}
+    },
+    "owner": "anikesh121"
   }
 }

@@ -2,53 +2,41 @@ import { Ionicons } from '@expo/vector-icons';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
-import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Modal,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
-    Platform,
-    Pressable,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  ImageStyle,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+  ViewStyle
 } from 'react-native';
 import Animated, {
-    FadeInDown,
-    FadeInUp,
-    interpolate,
-    SlideInRight,
-    useAnimatedStyle,
-    useSharedValue,
-    withTiming,
+  FadeInDown,
+  FadeInUp,
+  useSharedValue
 } from 'react-native-reanimated';
-import ALogoHeader from '../components/ALogoHeader';
-import DisasterCard from '../components/DisasterCard';
-import DonationCard from '../components/DonationCard';
-import DonationSuccessModal from '../components/DonationSuccessModal';
-import WeatherModal from '../components/WeatherModal';
-import { logout } from '../services/authService';
-import disasterService, { DisasterData } from '../services/disasterService';
-import realTimeService from '../services/realTimeService';
+import { useSafeAreaInsets as useSafeAreaInsetsContext } from 'react-native-safe-area-context';
+import { useAuth } from '../hooks/useAuth';
+import { useNoteService } from '../hooks/useNoteService';
 import { colors, shadows } from '../styles/theme';
 
 const { width } = Dimensions.get('window');
 
 const STRIPE_PUBLISHABLE_KEY = 'pk_test_51RH1RtLnm2eBVvTqnVeoBJepGyBj8cS0kFdlFgzwwcT66NRtDpyywesUqWZv08tfQQw3KlWPnqvrtBeq89ok5jXy00kkZ0iHlS';
-
-// OpenWeatherMap API configuration
-const OPENWEATHER_API_KEY = 'a8fe3125fdca88ccbc2a42423a7e4a5d';
-const OPENWEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
 interface MenuItem {
   title: string;
@@ -64,216 +52,279 @@ interface QuickAction {
   onPress: () => void;
 }
 
-interface DisasterUpdate {
+interface Note {
   id: string;
   title: string;
-  date: string;
-  source: string;
-  type: 'earthquake' | 'flood' | 'landslide' | 'fire' | 'other';
-  severity: 'low' | 'medium' | 'high';
-  location: string;
   description: string;
+  price: number;
+  status: string;
+  earnings: number;
+  purchase_count: number;
+  created_at: string;
 }
 
-interface WeatherData {
-  temperature: number;
-  cityName: string;
-  country: string;
+interface Purchase {
+  id: string;
+  note_title: string;
+  price: number;
+  purchased_at: string;
+  seller_name: string;
 }
+
+interface Earning {
+  id: string;
+  note_title: string;
+  amount: number;
+  earned_at: string;
+  buyer_name: string;
+}
+
+interface TrendingNote {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  rating: number;
+  purchase_count: number;
+  seller_name: string;
+}
+
+type StatItem = {
+  id: string;
+  label: string;
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+};
+
+type Styles = {
+  container: ViewStyle;
+  header: ViewStyle;
+  headerContent: ViewStyle;
+  headerTitleContainer: ViewStyle;
+  headerTitle: TextStyle;
+  headerSubtitle: TextStyle;
+  profileButton: ViewStyle;
+  profileImage: ImageStyle;
+  profilePlaceholder: ViewStyle;
+  menuButton: ViewStyle;
+  menuContainer: ViewStyle;
+  menuItem: ViewStyle;
+  menuItemText: TextStyle;
+  menuOverlay: ViewStyle;
+  menuHeader: ViewStyle;
+  menuCloseButton: ViewStyle;
+  menuTitle: TextStyle;
+  menuItems: ViewStyle;
+  scrollView: ViewStyle;
+  scrollContent: ViewStyle;
+  quickActionsSection: ViewStyle;
+  quickActionsScrollContainer: ViewStyle;
+  quickActionsPage: ViewStyle;
+  quickActionsRow: ViewStyle;
+  cardSection: ViewStyle;
+  sectionTitleContainer: ViewStyle;
+  sectionTitleWrapper: ViewStyle;
+  sectionTitle: TextStyle;
+  sectionSubtitle: TextStyle;
+  seeAllButton: ViewStyle;
+  seeAllText: TextStyle;
+  iconCircle: ViewStyle;
+  emptySection: ViewStyle;
+  emptySectionText: TextStyle;
+  browseButton: ViewStyle;
+  browseButtonText: TextStyle;
+  purchasesContainer: ViewStyle;
+  purchaseCard: ViewStyle;
+  purchaseContent: ViewStyle;
+  purchaseTitle: TextStyle;
+  purchaseMeta: TextStyle;
+  purchaseSeller: TextStyle;
+  loadingContainer: ViewStyle;
+  loadingText: TextStyle;
+  errorContainer: ViewStyle;
+  errorText: TextStyle;
+  retryButton: ViewStyle;
+  retryButtonText: TextStyle;
+  notesLoadingContainer: ViewStyle;
+  notesLoadingText: TextStyle;
+  notesErrorContainer: ViewStyle;
+  notesErrorText: TextStyle;
+  noNotesContainer: ViewStyle;
+  noNotesText: TextStyle;
+  noNotesSubtext: TextStyle;
+  uploadButton: ViewStyle;
+  uploadButtonText: TextStyle;
+  notesContainer: ViewStyle;
+  noteCard: ViewStyle;
+  noteCardContent: ViewStyle;
+  noteTitle: TextStyle;
+  noteDescription: TextStyle;
+  noteMeta: ViewStyle;
+  notePrice: TextStyle;
+  noteDate: TextStyle;
+  trendingSection: ViewStyle;
+  trendingContainer: ViewStyle;
+  trendingCard: ViewStyle;
+  trendingContent: ViewStyle;
+  trendingTitle: TextStyle;
+  trendingDescription: TextStyle;
+  trendingMeta: ViewStyle;
+  trendingStats: ViewStyle;
+  trendingPrice: TextStyle;
+  paginationContainer: ViewStyle;
+  paginationDot: ViewStyle;
+  paginationDotActive: ViewStyle;
+  actionCard: ViewStyle;
+  actionIconFloating: ViewStyle;
+  actionText: TextStyle;
+  statItem: ViewStyle;
+  statText: TextStyle;
+  statsGrid: ViewStyle;
+  statContent: ViewStyle;
+  statValue: TextStyle;
+  statLabel: TextStyle;
+  statsLoadingContainer: ViewStyle;
+  statsLoadingText: TextStyle;
+  statsErrorContainer: ViewStyle;
+  statsErrorText: TextStyle;
+};
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { user, signOut } = useAuth();
+  const { getMyNotes, getRecentPurchases, getRecentEarnings, getTrendingNotes } = useNoteService();
   const [menuVisible, setMenuVisible] = useState(false);
   const [profileImage, setProfileImage] = useState<string | null>(null);
-  const [weatherModalVisible, setWeatherModalVisible] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
-  const [activeDisasters, setActiveDisasters] = useState<DisasterData[]>([]);
-  const [loadingDisasters, setLoadingDisasters] = useState(true);
-  const [disasterError, setDisasterError] = useState<string | null>(null);
-
-  // Donation state
-  const [donationSuccessVisible, setDonationSuccessVisible] = useState(false);
-  const [donationAmount, setDonationAmount] = useState(0);
-  const [transactionId, setTransactionId] = useState('');
-
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const [disasterUpdates, setDisasterUpdates] = useState<DisasterData[]>([]);
-  const [loadingUpdates, setLoadingUpdates] = useState(true);
-  const [updatesError, setUpdatesError] = useState<string | null>(null);
-
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [weatherLoading, setWeatherLoading] = useState(true);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [myNotes, setMyNotes] = useState<Note[]>([]);
+  const [loadingNotes, setLoadingNotes] = useState(true);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
+  const [recentEarnings, setRecentEarnings] = useState<{ total: number; recent: number }>({ total: 0, recent: 0 });
+  const [trendingNotes, setTrendingNotes] = useState<TrendingNote[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const scrollY = useSharedValue(0);
   const contentHeight = useSharedValue(0);
   const scrollViewHeight = useSharedValue(0);
   const scrollViewRef = useRef<ScrollView>(null);
+  const insets = useSafeAreaInsetsContext();
+  const { height: windowHeight } = useWindowDimensions();
+  const [shouldAddPadding, setShouldAddPadding] = useState(false);
+  const [activeTrendingIndex, setActiveTrendingIndex] = useState(0);
+  const trendingScrollViewRef = useRef<ScrollView>(null);
+  const [activeQuickActionIndex, setActiveQuickActionIndex] = useState(0);
+  const quickActionsScrollViewRef = useRef<ScrollView>(null);
 
-  const handleDashboardScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+  const handleDashboardScroll = (event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
     scrollY.value = offsetY;
   };
 
   const handleContentSizeChange = (width: number, height: number) => {
     contentHeight.value = height;
+    const bottomInset = insets.bottom || 0;
+    setShouldAddPadding(height < windowHeight - bottomInset);
   };
 
   const handleLayout = (event: any) => {
     scrollViewHeight.value = event.nativeEvent.layout.height;
   };
 
-  const bottomPaddingStyle = useAnimatedStyle(() => {
-    const isAtBottom = scrollY.value + scrollViewHeight.value >= contentHeight.value - 50;
-    const padding = interpolate(
-      scrollY.value,
-      [contentHeight.value - scrollViewHeight.value - 100, contentHeight.value - scrollViewHeight.value],
-      [0, 30],
-      'clamp'
-    );
-    
-    return {
-      paddingBottom: withTiming(padding, { duration: 150 }),
-    };
-  });
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const bottomInset = insets.bottom || 0;
+    const paddingTriggered = layoutMeasurement.height + contentOffset.y >= contentSize.height - (bottomInset + 20);
+    setShouldAddPadding(paddingTriggered);
+  };
 
-  const fetchWeatherData = async (latitude: number, longitude: number) => {
-    try {
-      setWeatherLoading(true);
-      setWeatherError(null);
+  const handleTrendingScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const viewSize = event.nativeEvent.layoutMeasurement.width;
+    const index = Math.floor(contentOffset / viewSize);
+    setActiveTrendingIndex(index);
+  };
 
-      const response = await fetch(
-        `${OPENWEATHER_BASE_URL}/weather?lat=${latitude}&lon=${longitude}&units=metric&appid=${OPENWEATHER_API_KEY}`
-      );
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch weather data');
-      }
-
-      setWeatherData({
-        temperature: Math.round(data.main.temp),
-        cityName: data.name,
-        country: data.sys.country,
+  const scrollToTrendingIndex = (index: number) => {
+    if (trendingScrollViewRef.current) {
+      const screenWidth = Dimensions.get('window').width;
+      trendingScrollViewRef.current.scrollTo({
+        x: index * (screenWidth - 32), // Account for padding
+        animated: true,
       });
+    }
+  };
+
+  const handleQuickActionsScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const contentOffset = event.nativeEvent.contentOffset.x;
+    const viewSize = event.nativeEvent.layoutMeasurement.width;
+    const index = Math.floor(contentOffset / viewSize);
+    setActiveQuickActionIndex(index);
+  };
+
+  const scrollToQuickActionIndex = (index: number) => {
+    if (quickActionsScrollViewRef.current) {
+      const screenWidth = Dimensions.get('window').width;
+      quickActionsScrollViewRef.current.scrollTo({
+        x: index * (screenWidth - 32), // Account for padding
+        animated: true,
+      });
+    }
+  };
+
+  const loadMyNotes = async () => {
+    try {
+      setLoadingNotes(true);
+      setNotesError(null);
+      const notes = await getMyNotes();
+      setMyNotes(notes);
+    } catch (error: any) {
+      console.error('Error loading notes:', error);
+      setNotesError(error.message || 'Failed to load notes');
+    } finally {
+      setLoadingNotes(false);
+    }
+  };
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Load all data in parallel
+      const [purchases, earnings, trending] = await Promise.all([
+        getRecentPurchases(),
+        getRecentEarnings(),
+        getTrendingNotes()
+      ]);
+
+      // Map purchases to the correct format
+      const formattedPurchases = purchases.map(note => ({
+        id: note.id,
+        note_title: note.title,
+        price: note.price,
+        purchased_at: note.created_at,
+        seller_name: note.seller_name
+      }));
+
+      setRecentPurchases(formattedPurchases);
+      setRecentEarnings(earnings);
+      setTrendingNotes(trending);
     } catch (err) {
-      setWeatherError(err instanceof Error ? err.message : 'Failed to fetch weather data');
-      console.error('Error fetching weather:', err);
+      console.error('Error loading dashboard data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
-      setWeatherLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const requestLocationPermission = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(status === 'granted');
-
-      if (status === 'granted') {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        setUserLocation({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        });
-        // Fetch weather data when location is obtained
-        await fetchWeatherData(location.coords.latitude, location.coords.longitude);
-      } else {
-        Alert.alert(
-          'Location Permission Required',
-          'Please enable location access in your device settings to get weather information for your area.',
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get your location. Please try again.');
-    }
-  };
-
-  // Update useEffect to fetch weather data when location changes
   useEffect(() => {
-    if (userLocation) {
-      fetchWeatherData(userLocation.latitude, userLocation.longitude);
-    }
-  }, [userLocation]);
-
-  // Add initial weather fetch on mount
-  useEffect(() => {
-    requestLocationPermission();
+    loadMyNotes();
+    loadDashboardData();
   }, []);
-
-  const fetchDisasters = async () => {
-    try {
-      setLoadingDisasters(true);
-      setDisasterError(null);
-      const disasters = await disasterService.getActiveDisasters();
-      setActiveDisasters(disasters);
-    } catch (error: any) {
-      console.error('Error fetching disasters:', error);
-      setDisasterError(error.message || 'Failed to fetch disaster data');
-    } finally {
-      setLoadingDisasters(false);
-    }
-  };
-
-  const fetchDisasterUpdates = useCallback(async () => {
-    try {
-      setLoadingUpdates(true);
-      setUpdatesError(null);
-      const updates = await realTimeService.fetchLatestDisasters();
-      setDisasterUpdates(updates);
-    } catch (error: any) {
-      console.error('Error fetching disaster updates:', error);
-      setUpdatesError(error.message || 'Failed to fetch latest updates');
-    } finally {
-      setLoadingUpdates(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Subscribe to real-time updates
-    const unsubscribe = realTimeService.subscribeToDisasterUpdates((updates) => {
-      setDisasterUpdates(updates);
-    });
-
-    // Initial fetch
-    fetchDisasterUpdates();
-
-    // Start polling for updates
-    const cleanup = realTimeService.startDisasterPolling();
-
-    return () => {
-      unsubscribe();
-      cleanup();
-    };
-  }, [fetchDisasterUpdates]);
-
-  const handleWeatherPress = () => {
-    if (locationPermission === false) {
-      Alert.alert(
-        'Location Permission Required',
-        'Please enable location access in your device settings to get weather information for your area.',
-        [{ text: 'OK' }]
-      );
-    } else {
-      setWeatherModalVisible(true);
-    }
-  };
-
-  const handleDonation = async (amount: number, transactionId: string) => {
-    try {
-      // Show the success modal with the transaction ID
-      setDonationAmount(amount);
-      setTransactionId(transactionId);
-      setDonationSuccessVisible(true);
-    } catch (error) {
-      console.error('Error handling donation:', error);
-      Alert.alert('Error', 'An error occurred while processing your donation. Please try again.');
-    }
-  };
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -298,59 +349,11 @@ export default function DashboardScreen() {
       }
     },
     {
-      title: 'Emergency Contacts',
-      icon: 'call',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/emergency-contacts');
-      }
-    },
-    {
-      title: 'Disaster Map',
-      icon: 'map',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/disaster-map');
-      }
-    },
-    {
-      title: 'Report Disaster',
-      icon: 'warning',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/report-disaster');
-      }
-    },
-    {
-      title: 'Disaster Alerts',
-      icon: 'alert',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/alerts');
-      }
-    },
-    {
-      title: 'Historical Data',
-      icon: 'bar-chart',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/historical-data');
-      }
-    },
-    {
-      title: 'My Reports',
+      title: 'My Notes',
       icon: 'document-text',
       onPress: () => {
         setMenuVisible(false);
-        router.push('/(dashboard)/my-reports');
-      }
-    },
-    {
-      title: 'Volunteer Status',
-      icon: 'people',
-      onPress: () => {
-        setMenuVisible(false);
-        router.push('/(dashboard)/volunteer-status');
+        router.push('/(dashboard)/my-notes');
       }
     },
     {
@@ -358,7 +361,7 @@ export default function DashboardScreen() {
       icon: 'settings',
       onPress: () => {
         setMenuVisible(false);
-        router.push('/settings' as any);
+        router.push('/(dashboard)/settings');
       }
     },
     {
@@ -367,10 +370,7 @@ export default function DashboardScreen() {
       onPress: async () => {
         setMenuVisible(false);
         try {
-          const { clearAuthState } = await import('../utils/authState');
-          await clearAuthState();
-          await logout();
-          router.replace('/(auth)/LoginScreen');
+          await signOut();
         } catch (error) {
           console.error('Error during logout:', error);
         }
@@ -378,62 +378,65 @@ export default function DashboardScreen() {
     }
   ];
 
-  const stats = [
-    { label: 'Preparedness Score', value: '85%', icon: 'shield-checkmark-outline' as const, color: '#4CAF50' },
-    { label: 'Nearby Shelters', value: '3', icon: 'home-outline' as const, color: '#2196F3' },
-    { label: 'Active Volunteers', value: '12', icon: 'people-outline' as const, color: '#FF9800' },
-  ];
-
-  const newsItems = [
+  const quickActions: QuickAction[] = [
     {
-      title: 'Earthquake Preparedness Workshop',
-      date: '2 hours ago',
-      source: 'NDRRMA',
-      icon: 'newspaper-outline' as const,
+      title: 'Browse Notes',
+      icon: 'search-outline',
+      color: '#007AFF',
+      onPress: () => router.push('/(dashboard)/browse'),
     },
     {
-      title: 'New Emergency Shelters Added',
-      date: '5 hours ago',
-      source: 'Local News',
-      icon: 'home-outline' as const,
+      title: 'My Notes',
+      icon: 'document-text-outline',
+      color: '#34C759',
+      onPress: () => router.push('/(dashboard)/my-notes'),
+    },
+    {
+      title: 'Upload Note',
+      icon: 'cloud-upload-outline',
+      color: '#FF9500',
+      onPress: () => router.push('/(dashboard)/upload'),
+    },
+    {
+      title: 'Wallet',
+      icon: 'wallet-outline',
+      color: '#5856D6',
+      onPress: () => router.push('/(dashboard)/wallet'),
+    },
+    {
+      title: 'Profile',
+      icon: 'person-outline',
+      color: '#FF2D55',
+      onPress: () => router.push('/(dashboard)/profile'),
+    },
+    {
+      title: 'Settings',
+      icon: 'settings-outline',
+      color: '#8E8E93',
+      onPress: () => router.push('/(dashboard)/settings'),
     },
   ];
 
-  // Add scroll handler for pagination
-  const handleDisasterCardScroll = (event: any) => {
-    const contentOffset = event.nativeEvent.contentOffset.x;
-    const cardWidth = 296; // card width + margin
-    const index = Math.round(contentOffset / cardWidth);
-    setActiveCardIndex(index);
-  };
-
-  // Render disaster cards section
-  const renderDisastersSection = () => {
-    if (loadingDisasters) {
+  const renderNotesSection = () => {
+    if (loadingNotes) {
       return (
-        <View style={styles.disasterLoadingContainer}>
-          <View style={styles.loadingSpinner}>
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary }]} />
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary, opacity: 0.7, marginLeft: 8 }]} />
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary, opacity: 0.4, marginLeft: 8 }]} />
-          </View>
-          <Text style={styles.disasterLoadingText}>Loading disaster information...</Text>
+        <View style={styles.notesLoadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.notesLoadingText}>Loading your notes...</Text>
         </View>
       );
     }
 
-    if (disasterError) {
+    if (notesError) {
       return (
-        <View style={styles.disasterErrorContainer}>
-          <View style={styles.errorIconContainer}>
-            <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
-          </View>
-          <Text style={styles.disasterErrorText}>{disasterError}</Text>
+        <View style={styles.notesErrorContainer}>
+          <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
+          <Text style={styles.notesErrorText}>{notesError}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              fetchDisasters();
+              loadMyNotes();
             }}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
@@ -442,50 +445,266 @@ export default function DashboardScreen() {
       );
     }
 
-    if (activeDisasters.length === 0) {
+    if (myNotes.length === 0) {
       return (
-        <View style={styles.noDisastersContainer}>
-          <View style={styles.noDisastersIconContainer}>
-            <Ionicons name="checkmark-circle-outline" size={32} color={colors.success} />
-          </View>
-          <Text style={styles.noDisastersText}>No active disasters in your area</Text>
-          <Text style={styles.noDisastersSubtext}>Stay safe and stay prepared</Text>
+        <View style={styles.noNotesContainer}>
+          <Ionicons name="document-text-outline" size={32} color={colors.success} />
+          <Text style={styles.noNotesText}>No notes yet</Text>
+          <Text style={styles.noNotesSubtext}>Start uploading your notes to share with others</Text>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={() => router.push('/(dashboard)/upload')}
+          >
+            <Text style={styles.uploadButtonText}>Upload Note</Text>
+          </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.disasterCardsWrapper}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.disasterCardsContainer}
-          decelerationRate="fast"
-          snapToInterval={296} // card width + margin
-          snapToAlignment="start"
-          onScroll={handleDisasterCardScroll}
-          scrollEventThrottle={16}
-          pagingEnabled
-          bounces={false}
+        contentContainerStyle={styles.notesContainer}
       >
-        {activeDisasters.map((disaster, index) => (
+        {myNotes.map((note: any, index: number) => (
           <Animated.View
-            key={disaster.id}
-              entering={FadeInDown.delay(index * 100).springify()}
-              style={styles.disasterCardWrapper}
+            key={note.id}
+            entering={FadeInDown.delay(index * 100).springify()}
           >
-            <DisasterCard disaster={disaster} compact />
+            <TouchableOpacity
+              style={styles.noteCard}
+              onPress={() => router.push({
+                pathname: '/(dashboard)/note-details',
+                params: { id: note.id }
+              })}
+            >
+              <View style={styles.noteCardContent}>
+                <Text style={styles.noteTitle} numberOfLines={2}>
+                  {note.title}
+                </Text>
+                <Text style={styles.noteDescription} numberOfLines={3}>
+                  {note.description}
+                </Text>
+                <View style={styles.noteMeta}>
+                  <Text style={styles.notePrice}>Rs. {note.price}</Text>
+                  <Text style={styles.noteDate}>
+                    {new Date(note.created_at).toLocaleDateString()}
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
           </Animated.View>
         ))}
       </ScrollView>
-        <View style={styles.disasterScrollIndicator}>
-          {activeDisasters.map((_, index) => (
-            <View
+    );
+  };
+
+  const renderStatsSection = () => {
+    const stats = [
+      {
+        id: 'recent',
+        label: 'Recent Earnings',
+        value: `Rs. ${recentEarnings.recent}`,
+        icon: 'trending-up-outline',
+        color: colors.primary
+      },
+      {
+        id: 'notes',
+        label: 'My Notes',
+        value: myNotes.length.toString(),
+        icon: 'document-text-outline',
+        color: colors.warning
+      },
+      {
+        id: 'purchases',
+        label: 'Purchases',
+        value: recentPurchases.length.toString(),
+        icon: 'cart-outline',
+        color: colors.secondary
+      }
+    ];
+
+    return (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingTop: 16 }}>
+        {stats.map((stat) => (
+          <View 
+            key={stat.id}
+            style={{
+              flex: 1,
+              minWidth: '45%',
+              padding: 16,
+            }}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: stat.color }]}>
+              <Ionicons name={stat.icon as any} size={20} color="#fff" />
+            </View>
+            <View style={{ marginTop: 12 }}>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 4 }}>
+                {stat.value}
+              </Text>
+              <Text style={{ fontSize: 14, color: colors.textLight }}>
+                {stat.label}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  const renderRecentPurchases = () => {
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading purchases...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={24} color={colors.danger} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={loadDashboardData}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    if (recentPurchases.length === 0) {
+      return (
+        <View style={styles.emptySection}>
+          <Ionicons name="cart-outline" size={32} color={colors.textLight} />
+          <Text style={styles.emptySectionText}>No recent purchases</Text>
+          <TouchableOpacity
+            style={styles.browseButton}
+            onPress={() => router.push('/(dashboard)/browse')}
+          >
+            <Text style={styles.browseButtonText}>Browse Notes</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.purchasesContainer}
+      >
+        {recentPurchases.map((purchase) => (
+          <TouchableOpacity
+            key={`recent-purchase-${purchase.id}`}
+            style={styles.purchaseCard}
+            onPress={() => router.push({
+              pathname: '/(dashboard)/note-details',
+              params: { id: purchase.id }
+            })}
+          >
+            <View style={styles.purchaseContent}>
+              <Text style={styles.purchaseTitle} numberOfLines={2}>
+                {purchase.note_title}
+              </Text>
+              <Text style={styles.purchaseMeta}>
+                Rs. {purchase.price} • {new Date(purchase.purchased_at).toLocaleDateString()}
+              </Text>
+              <Text style={styles.purchaseSeller}>by {purchase.seller_name}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
+
+  const renderTrendingNotes = () => {
+    if (trendingNotes.length === 0) {
+      return null;
+    }
+
+    return (
+      <View style={styles.trendingSection}>
+        <View style={styles.sectionTitleContainer}>
+          <View style={styles.sectionTitleWrapper}>
+            <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
+              <Ionicons name="trending-up" size={20} color="#fff" />
+            </View>
+            <View>
+              <Text style={styles.sectionTitle}>Trending Notes</Text>
+              <Text style={styles.sectionSubtitle}>
+                {trendingNotes.length} {trendingNotes.length === 1 ? 'note' : 'notes'} trending
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.seeAllButton}
+            onPress={() => router.push('/(dashboard)/browse')}
+          >
+            <Text style={styles.seeAllText}>See All</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+        <ScrollView
+          ref={trendingScrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleTrendingScroll}
+          scrollEventThrottle={16}
+          decelerationRate="fast"
+          snapToInterval={Dimensions.get('window').width - 32} // Account for padding
+          snapToAlignment="start"
+          contentContainerStyle={styles.trendingContainer}
+        >
+          {trendingNotes.map((note, index) => (
+            <TouchableOpacity
+              key={note.id}
+              style={styles.trendingCard}
+              onPress={() => router.push({
+                pathname: '/(dashboard)/note-details',
+                params: { id: note.id }
+              })}
+              activeOpacity={0.7}
+            >
+              <View style={styles.trendingContent}>
+                <Text style={styles.trendingTitle} numberOfLines={2}>
+                  {note.title}
+                </Text>
+                <Text style={styles.trendingDescription} numberOfLines={3}>
+                  {note.description}
+                </Text>
+                <View style={styles.trendingMeta}>
+                  <View style={styles.trendingStats}>
+                    <View style={styles.statItem}>
+                      <Ionicons name="people-outline" size={16} color={colors.textLight} />
+                      <Text style={styles.statText}>{note.purchase_count} bought</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                      <Ionicons name="star" size={16} color="#FFD700" />
+                      <Text style={styles.statText}>{note.rating.toFixed(1)}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.trendingPrice}>Rs. {note.price}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <View style={styles.paginationContainer}>
+          {trendingNotes.map((_, index) => (
+            <TouchableOpacity
               key={index}
               style={[
-                styles.scrollDot,
-                index === activeCardIndex && styles.scrollDotActive
+                styles.paginationDot,
+                index === activeTrendingIndex && styles.paginationDotActive
               ]}
+              onPress={() => scrollToTrendingIndex(index)}
             />
           ))}
         </View>
@@ -493,16 +712,14 @@ export default function DashboardScreen() {
     );
   };
 
-  const renderHeader = () => (
-    <LinearGradient
-      colors={['#FF3B30', '#FF6B6B']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.headerContainer}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerTop}>
+  return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight }]}>
+          <View style={styles.headerContent}>
             <TouchableOpacity
               style={styles.menuButton}
               onPress={() => {
@@ -510,870 +727,442 @@ export default function DashboardScreen() {
                 setMenuVisible(true);
               }}
             >
-              <Ionicons name="menu" size={28} color="#fff" />
+              <Ionicons name="menu" size={24} color={colors.text} />
             </TouchableOpacity>
-            <View style={styles.welcomeContent}>
-              <Text style={styles.welcomeEmoji}>👋</Text>
-              <View style={styles.welcomeTextContainer}>
-                <Text style={styles.welcomeGreeting}>Hello,</Text>
-                <Text style={styles.welcomeName}>User</Text>
-              </View>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>NoteBazaar</Text>
+              <Text style={styles.headerSubtitle}>Share & Learn</Text>
             </View>
-            {weatherLoading ? (
-              <View style={styles.weatherInfo}>
-                <ActivityIndicator color="#fff" size="small" />
-              </View>
-            ) : weatherData ? (
-              <View style={styles.weatherInfo}>
-                <Text style={styles.temperature}>{weatherData.temperature}°C</Text>
-                <Text style={styles.location}>{weatherData.cityName}</Text>
-              </View>
-            ) : null}
-          </View>
-          <View style={styles.welcomeStats}>
-            <View style={styles.statPill}>
-              <Ionicons name="shield-checkmark" size={16} color="#fff" />
-              <Text style={styles.statPillText}>Safe Zone</Text>
-            </View>
-            {weatherData && (
-              <View style={styles.statPill}>
-                <Ionicons name="location" size={16} color="#fff" />
-                <Text style={styles.statPillText}>{weatherData.country}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-      </View>
-      <View style={styles.headerWave}>
-        <View style={styles.wave} />
-      </View>
-    </LinearGradient>
-  );
-
-  const renderMenu = () => (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={menuVisible}
-      onRequestClose={() => setMenuVisible(false)}
-    >
-      <Pressable
-        style={styles.menuOverlay}
-        onPress={() => setMenuVisible(false)}
-      >
-        <View style={styles.menuContainer}>
-          <View style={styles.menuHeader}>
-            <ALogoHeader size="small" />
             <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setMenuVisible(false)}
+              style={styles.profileButton}
+              onPress={() => router.push('/(dashboard)/profile')}
             >
-              <Ionicons name="close" size={28} color={colors.text} />
+              {profileImage ? (
+                <Image source={{ uri: profileImage }} style={styles.profileImage} />
+              ) : (
+                <View style={styles.profilePlaceholder}>
+                  <Ionicons name="person" size={20} color={colors.text} />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
-          <View style={styles.menuProfileSection}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.menuProfileImage} />
-            ) : (
-              <View style={styles.menuProfilePlaceholder}>
-                <Ionicons name="person" size={32} color={colors.text} />
-              </View>
-            )}
-            <Text style={styles.menuProfileText}>My Account</Text>
-          </View>
-          <ScrollView style={styles.menuItems}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItem}
-                onPress={item.onPress}
-              >
-                <View style={styles.menuItemContent}>
-                  <View style={styles.menuIconContainer}>
-                    <Ionicons
-                      name={item.icon as any}
-                      size={24}
-                      color="#FF0000"
-                      style={styles.menuIcon}
-                    />
-                  </View>
-                  <Text style={styles.menuItemText}>
-                    {item.title}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
-      </Pressable>
-    </Modal>
-  );
 
-  const quickActions: QuickAction[] = [
-    {
-      title: 'Emergency Contacts',
-      icon: 'call-outline',
-      color: '#FF5A5F',
-      onPress: () => router.push('/(dashboard)/emergency-contacts'),
-    },
-    {
-      title: 'Disaster Map',
-      icon: 'map-outline',
-      color: '#3498DB',
-      onPress: () => router.push('/(dashboard)/disaster-map'),
-    },
-    {
-      title: 'Report Disaster',
-      icon: 'warning-outline',
-      color: '#E74C3C',
-      onPress: () => router.push('/(dashboard)/report-disaster'),
-    },
-    {
-      title: 'Disaster Alerts',
-      icon: 'alert-outline',
-      color: '#F39C12',
-      onPress: () => router.push('/(dashboard)/alerts'),
-    },
-    {
-      title: 'Historical Data',
-      icon: 'bar-chart-outline',
-      color: '#9B59B6',
-      onPress: () => router.push('/(dashboard)/historical-data'),
-    },
-    {
-      title: 'My Reports',
-      icon: 'document-text-outline',
-      color: '#1ABC9C',
-      onPress: () => router.push('/(dashboard)/my-reports'),
-    },
-    {
-      title: 'Weather',
-      icon: 'partly-sunny-outline',
-      color: '#2ECC71',
-      onPress: handleWeatherPress,
-    },
-    {
-      title: 'Volunteer Status',
-      icon: 'people-outline',
-      color: '#34495E',
-      onPress: () => router.push('/(dashboard)/volunteer-status'),
-    },
-  ];
-
-  const getUpdateIcon = (type: DisasterData['type']) => {
-    switch (type) {
-      case 'earthquake':
-        return 'pulse-outline';
-      case 'flood':
-        return 'water-outline';
-      case 'landslide':
-        return 'earth-outline';
-      case 'fire':
-        return 'flame-outline';
-      case 'avalanche':
-        return 'snow-outline';
-      case 'storm':
-        return 'thunderstorm-outline';
-      case 'drought':
-        return 'sunny-outline';
-      default:
-        return 'alert-outline';
-    }
-  };
-
-  const getSeverityColor = (severity: DisasterData['severity']) => {
-    switch (severity) {
-      case 'CRITICAL':
-        return '#FF3B30';
-      case 'HIGH':
-        return '#FF9500';
-      case 'MEDIUM':
-        return '#FFCC00';
-      case 'LOW':
-        return '#34C759';
-      default:
-        return colors.primary;
-    }
-  };
-
-  const renderUpdatesSection = () => {
-    if (loadingUpdates) {
-      return (
-        <View style={styles.updatesLoadingContainer}>
-          <View style={styles.loadingSpinner}>
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary }]} />
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary, opacity: 0.7, marginLeft: 8 }]} />
-            <View style={[styles.loadingDot, { backgroundColor: colors.primary, opacity: 0.4, marginLeft: 8 }]} />
-          </View>
-          <Text style={styles.updatesLoadingText}>Fetching latest updates...</Text>
-        </View>
-      );
-    }
-
-    if (updatesError) {
-      return (
-        <View style={styles.updatesErrorContainer}>
-          <View style={styles.errorIconContainer}>
-            <Ionicons name="alert-circle-outline" size={32} color={colors.danger} />
-          </View>
-          <Text style={styles.updatesErrorText}>{updatesError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              fetchDisasterUpdates();
-            }}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
-    if (disasterUpdates.length === 0) {
-      return (
-        <View style={styles.noUpdatesContainer}>
-          <View style={styles.noUpdatesIconContainer}>
-            <Ionicons name="checkmark-circle-outline" size={32} color={colors.success} />
-          </View>
-          <Text style={styles.noUpdatesText}>No active disasters</Text>
-          <Text style={styles.noUpdatesSubtext}>All systems are normal</Text>
-        </View>
-      );
-    }
-
-    return (
-      <>
-        {disasterUpdates.map((update, index) => (
-          <Animated.View
-            key={update.id}
-            entering={SlideInRight.delay(index * 100).duration(400)}
-          >
-            <TouchableOpacity
-              style={styles.updateCard}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push({
-                  pathname: '/(dashboard)/disaster-details',
-                  params: { id: update.id }
-                });
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.updateIconFloating, { backgroundColor: getSeverityColor(update.severity) }]}>
-                <Ionicons name={getUpdateIcon(update.type)} size={24} color="#fff" />
-              </View>
-              <View style={styles.updateContent}>
-                <View style={styles.updateHeader}>
-                  <Text style={styles.updateTitle}>{update.title}</Text>
-                  <View style={[styles.severityBadge, { backgroundColor: getSeverityColor(update.severity) + '20' }]}>
-                    <Text style={[styles.severityText, { color: getSeverityColor(update.severity) }]}>
-                      {update.severity}
-                    </Text>
-                  </View>
-                </View>
-                <Text style={styles.updateLocation}>{update.location}, {update.district}</Text>
-                <Text style={styles.updateDescription} numberOfLines={2}>
-                  {update.description}
-                </Text>
-                <View style={styles.updateMeta}>
-                  <Text style={styles.updateSource}>{update.type}</Text>
-                  <Text style={styles.updateDate}>
-                    {new Date(update.timestamp).toLocaleString('en-US', {
-                      hour: 'numeric',
-                      minute: 'numeric',
-                      hour12: true
-                    })}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
-      </>
-    );
-  };
-
-  return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-      <View style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        {/* Main Content */}
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={[styles.scrollContent, bottomPaddingStyle]}
-          onScroll={handleDashboardScroll}
+          contentContainerStyle={[
+            styles.scrollContent,
+            shouldAddPadding && { paddingBottom: (insets.bottom || 0) + 20 }
+          ]}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           onContentSizeChange={handleContentSizeChange}
           onLayout={handleLayout}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.quickActionsHeader}>
-            <Text style={styles.sectionHeader}>Quick Actions</Text>
-            <TouchableOpacity
-              style={styles.viewAllButton}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push('/(dashboard)/all-actions');
-              }}
-            >
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsScrollContainer}
-            onScroll={handleDisasterCardScroll}
-            scrollEventThrottle={16}
+          {/* Quick Actions Section */}
+          <Animated.View
+            style={styles.quickActionsSection}
+            entering={FadeInUp.delay(100).duration(500)}
           >
-            {quickActions.map((action: QuickAction, index: number) => (
-              <Animated.View
-                key={index}
-                entering={FadeInDown.delay(index * 70).duration(400)}
-              >
-                <TouchableOpacity
-                  style={styles.actionCard}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    action.onPress();
-                  }}
-                  activeOpacity={0.7}
+            <View style={styles.sectionTitleContainer}>
+              <View style={styles.sectionTitleWrapper}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="flash" size={20} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.sectionTitle}>Quick Actions</Text>
+                  <Text style={styles.sectionSubtitle}>Get started quickly</Text>
+                </View>
+              </View>
+            </View>
+            <ScrollView
+              ref={quickActionsScrollViewRef}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={handleQuickActionsScroll}
+              scrollEventThrottle={16}
+              decelerationRate="fast"
+              snapToInterval={Dimensions.get('window').width - 32} // Account for padding
+              snapToAlignment="start"
+              contentContainerStyle={styles.quickActionsScrollContainer}
+            >
+              {quickActions.map((action: QuickAction, index: number) => (
+                <Animated.View
+                  key={index}
+                  entering={FadeInDown.delay(index * 70).duration(400)}
+                  style={styles.quickActionsPage}
                 >
-                  <View style={[styles.actionIconFloating, { backgroundColor: action.color }]}>
-                    <Ionicons name={action.icon as any} size={26} color="#fff" />
+                  <View style={styles.quickActionsRow}>
+                    {quickActions.slice(index * 3, (index + 1) * 3).map((action, actionIndex) => (
+                      <TouchableOpacity
+                        key={actionIndex}
+                        style={styles.actionCard}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          action.onPress();
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.actionIconFloating, { backgroundColor: action.color }]}>
+                          <Ionicons name={action.icon as any} size={26} color="#fff" />
+                        </View>
+                        <Text style={[styles.actionText, { color: action.color }]}>{action.title}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                  <Text style={[styles.actionText, { color: action.color }]}>{action.title}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </ScrollView>
+                </Animated.View>
+              ))}
+            </ScrollView>
+            <View style={styles.paginationContainer}>
+              {Array.from({ length: Math.ceil(quickActions.length / 3) }).map((_, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.paginationDot,
+                    index === activeQuickActionIndex && styles.paginationDotActive
+                  ]}
+                  onPress={() => scrollToQuickActionIndex(index)}
+                />
+              ))}
+            </View>
+          </Animated.View>
 
+          {/* Stats Section */}
+          <Animated.View
+            style={styles.cardSection}
+            entering={FadeInUp.delay(200).duration(500)}
+          >
+            <View style={styles.sectionTitleContainer}>
+              <View style={styles.sectionTitleWrapper}>
+                <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="stats-chart" size={20} color="#fff" />
+                </View>
+                <View>
+                  <Text style={styles.sectionTitle}>Statistics</Text>
+                  <Text style={styles.sectionSubtitle}>Your activity overview</Text>
+                </View>
+              </View>
+            </View>
+            {renderStatsSection()}
+          </Animated.View>
+
+          {/* Recent Purchases */}
           <Animated.View
             style={styles.cardSection}
             entering={FadeInUp.delay(300).duration(500)}
           >
             <View style={styles.sectionTitleContainer}>
               <View style={styles.sectionTitleWrapper}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.danger }]}>
-                  <Ionicons name="warning" size={20} color="#fff" />
+                <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="cart" size={20} color="#fff" />
                 </View>
                 <View>
-                <Text style={styles.sectionTitle}>Active Disasters</Text>
+                  <Text style={styles.sectionTitle}>Recent Purchases</Text>
                   <Text style={styles.sectionSubtitle}>
-                    {activeDisasters.length} {activeDisasters.length === 1 ? 'disaster' : 'disasters'} reported
+                    {isLoading ? 'Loading...' : 
+                     recentPurchases.length === 0 ? 'No purchases yet' :
+                     `${recentPurchases.length} ${recentPurchases.length === 1 ? 'note' : 'notes'} bought`}
                   </Text>
                 </View>
               </View>
               <TouchableOpacity
                 style={styles.seeAllButton}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/(dashboard)/alerts' as any);
-                }}
+                onPress={() => router.push("/(dashboard)/purchases")}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            {renderDisastersSection()}
+            {renderRecentPurchases()}
           </Animated.View>
 
+          {/* My Notes Section */}
           <Animated.View
             style={styles.cardSection}
             entering={FadeInUp.delay(400).duration(500)}
           >
             <View style={styles.sectionTitleContainer}>
               <View style={styles.sectionTitleWrapper}>
-                <View style={[styles.iconCircle, { backgroundColor: colors.secondary }]}>
-                  <Ionicons name="stats-chart" size={18} color="#fff" />
-                </View>
-                <Text style={styles.sectionTitle}>Your Status</Text>
-              </View>
-            </View>
-            <View style={styles.statsContainer}>
-              {stats.map((stat, index) => (
-                <Animated.View
-                  key={index}
-                  entering={FadeInDown.delay(500 + index * 100)}
-                  style={styles.statCard}
-                >
-                  <View style={[styles.statIconFloating, { backgroundColor: stat.color }]}>
-                    <Ionicons name={stat.icon} size={26} color="#fff" />
-                  </View>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                </Animated.View>
-              ))}
-            </View>
-          </Animated.View>
-
-          <Animated.View
-            style={styles.cardSection}
-            entering={FadeInUp.delay(500).duration(500)}
-          >
-            <View style={styles.sectionTitleContainer}>
-              <View style={styles.sectionTitleWrapper}>
                 <View style={[styles.iconCircle, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="newspaper" size={18} color="#fff" />
+                  <Ionicons name="document-text" size={20} color="#fff" />
                 </View>
-                <Text style={styles.sectionTitle}>Latest Updates</Text>
+                <View>
+                  <Text style={styles.sectionTitle}>My Notes</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    {myNotes.length} {myNotes.length === 1 ? 'note' : 'notes'} uploaded
+                  </Text>
+                </View>
               </View>
-                <TouchableOpacity
+              <TouchableOpacity
                 style={styles.seeAllButton}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/(dashboard)/alerts' as any);
-                }}
+                onPress={() => router.push('/(dashboard)/my-notes')}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.primary} />
-                </TouchableOpacity>
+              </TouchableOpacity>
             </View>
-            {renderUpdatesSection()}
+            {renderNotesSection()}
           </Animated.View>
 
-          <Animated.View
-            entering={FadeInUp.delay(600).duration(500)}
-          >
-            <DonationCard onDonate={handleDonation} />
-          </Animated.View>
+          {/* Trending Notes */}
+          {renderTrendingNotes()}
         </ScrollView>
-        {renderMenu()}
-        <WeatherModal
-          visible={weatherModalVisible}
-          onClose={() => setWeatherModalVisible(false)}
-          userLocation={userLocation || undefined}
-          onRequestPermission={requestLocationPermission}
-          hasPermission={locationPermission}
-        />
-        <DonationSuccessModal
-          visible={donationSuccessVisible}
-          amount={donationAmount}
-          transactionId={transactionId}
-          onClose={() => setDonationSuccessVisible(false)}
-        />
+
+        {/* Menu Modal */}
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuVisible(false)}
+        >
+          <Pressable
+            style={styles.menuOverlay}
+            onPress={() => setMenuVisible(false)}
+          >
+            <Animated.View
+              style={[styles.menuContainer, { transform: [{ translateX: menuVisible ? 0 : -300 }] }]}
+              entering={FadeInDown.duration(300)}
+            >
+              <View style={styles.menuHeader}>
+                <TouchableOpacity
+                  style={styles.menuCloseButton}
+                  onPress={() => setMenuVisible(false)}
+                >
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.menuTitle}>Menu</Text>
+              </View>
+              <View style={styles.menuItems}>
+                {menuItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.menuItem}
+                    onPress={item.onPress}
+                  >
+                    <Ionicons name={item.icon as any} size={24} color={colors.text} />
+                    <Text style={styles.menuItemText}>{item.title}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Animated.View>
+          </Pressable>
+        </Modal>
       </View>
     </StripeProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = StyleSheet.create<Styles>({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  // Header styles
-  headerContainer: {
-    position: 'relative',
-    marginBottom: 15,
-    ...shadows.medium,
+    backgroundColor: colors.background,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 50 : StatusBar.currentHeight,
-    paddingBottom: 60,
-    paddingHorizontal: 20,
-  },
-  headerWave: {
-    height: 40,
-    overflow: 'hidden',
-    position: 'absolute',
-    bottom: -1,
-    left: 0,
-    right: 0,
-  },
-  wave: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -25,
-    height: 60,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   headerContent: {
-    marginBottom: 10,
-  },
-  headerTop: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
   },
   menuButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...shadows.small,
   },
-  headerRight: {
-    width: 44, // Same width as menuButton to maintain balance
-  },
-  welcomeContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerTitleContainer: {
     flex: 1,
-    marginLeft: 12,
-  },
-  welcomeEmoji: {
-    fontSize: 32,
-    marginRight: 8,
-  },
-  welcomeTextContainer: {
-    flex: 1,
-  },
-  welcomeGreeting: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
-  },
-  welcomeName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  welcomeStats: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  statPill: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  statPillText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  // Content styles
-  content: {
-    padding: 20,
-  },
-  sectionHeader: {
-    fontSize: 22,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 15,
   },
-  // Quick actions styles
-  quickActionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  headerSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 2,
+  },
+  profileButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
+    ...shadows.small,
   },
-  viewAllButton: {
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  profileImage: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
   },
-  viewAllText: {
-    fontSize: 12,
-    color: colors.textLight,
-    fontWeight: '600',
+  profilePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  quickActionsSection: {
+    marginBottom: 24,
   },
   quickActionsScrollContainer: {
-    paddingRight: 20,
-    paddingBottom: 10,
+    paddingRight: 16,
+  },
+  quickActionsPage: {
+    width: Dimensions.get('window').width - 32, // Full width minus padding
+    marginRight: 16,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   actionCard: {
-    width: 110,
-    height: 110,
-    padding: 12,
-    marginRight: 12,
-    alignItems: 'center',
+    flex: 1,
+    aspectRatio: 1,
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    alignItems: 'center',
   },
   actionIconFloating: {
-    width: 56,
-    height: 56,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    ...shadows.medium,
-    borderWidth: 2,
-    borderColor: '#fff',
+    marginBottom: 8,
   },
   actionText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
   },
-  // Section common styles
   cardSection: {
-    marginBottom: 20,
-    backgroundColor: 'transparent',
-    borderRadius: 24,
-    padding: 18,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    ...shadows.small,
   },
   sectionTitleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   sectionTitleWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
-    backgroundColor: colors.primary,
+    marginRight: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
   },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginTop: 2,
+  },
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
   },
   seeAllText: {
     fontSize: 14,
     color: colors.primary,
-    fontWeight: '600',
     marginRight: 4,
   },
-  // Stats section styles
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 15,
+  notesContainer: {
+    paddingRight: 16,
   },
-  statCard: {
-    flex: 1,
-    padding: 15,
-    marginHorizontal: 5,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
-  statIconFloating: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    ...shadows.medium,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  statValue: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 5,
-  },
-  statLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textLight,
-    textAlign: 'center',
-  },
-  // News section styles
-  newsCard: {
-    padding: 12,
-    marginBottom: 16,
-    marginTop: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    position: 'relative',
-    backgroundColor: 'transparent',
-  },
-  newsIconFloating: {
-    width: 54,
-    height: 54,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    ...shadows.medium,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  newsContent: {
-    flex: 1,
-  },
-  newsTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 6,
-  },
-  newsMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  newsSource: {
-    fontSize: 14,
-    color: colors.primary,
-    marginRight: 10,
-    fontWeight: '600',
-  },
-  newsDate: {
-    fontSize: 13,
-    color: colors.textLight,
-    fontWeight: '500',
-  },
-  newsArrow: {
-    width: 36,
-    height: 36,
+  noteCard: {
+    width: 280,
+    backgroundColor: colors.background,
     borderRadius: 12,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...shadows.medium,
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  // Map section styles
-  mapCard: {
-    height: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    position: 'relative',
-    marginTop: 10,
-    ...shadows.medium,
-  },
-  mapImage: {
-    width: '100%',
-    height: '100%',
-  },
-  mapOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-  },
-  mapContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  mapText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
-  },
-  mapSubtext: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 14,
-    marginTop: 5,
-  },
-  mapIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginRight: 12,
+    padding: 16,
     ...shadows.small,
   },
-  mapBadgeText: {
-    color: '#fff',
-    fontSize: 12,
+  noteCardContent: {
+    flex: 1,
+  },
+  noteTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 5,
+    color: colors.text,
+    marginBottom: 8,
   },
-  // Disaster section styles
-  disasterCardsWrapper: {
-    marginTop: 8,
-  },
-  disasterCardsContainer: {
-    paddingRight: 20,
-    paddingBottom: 16,
-    paddingLeft: 4, // Add some padding on the left for better visual balance
-  },
-  disasterCardWrapper: {
-    marginRight: 16,
-    width: 280, // Explicitly set width for better snap behavior
-  },
-  disasterLoadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  loadingSpinner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  noteDescription: {
+    fontSize: 14,
+    color: colors.textLight,
     marginBottom: 12,
   },
-  loadingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  noteMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  disasterLoadingText: {
+  notePrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  noteDate: {
+    fontSize: 12,
+    color: colors.textLight,
+  },
+  notesLoadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  notesLoadingText: {
+    marginTop: 12,
     fontSize: 14,
     color: colors.textLight,
   },
-  disasterErrorContainer: {
+  notesErrorContainer: {
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
   },
-  errorIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.danger + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  disasterErrorText: {
+  notesErrorText: {
+    marginTop: 12,
     fontSize: 14,
     color: colors.text,
     textAlign: 'center',
     marginBottom: 16,
-    paddingHorizontal: 32,
   },
   retryButton: {
-    backgroundColor: colors.danger,
+    backgroundColor: colors.primary,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
@@ -1383,54 +1172,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  noDisastersContainer: {
+  noNotesContainer: {
+    padding: 32,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
   },
-  noDisastersIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.success + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  noDisastersText: {
+  noNotesText: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+    marginTop: 12,
     marginBottom: 4,
   },
-  noDisastersSubtext: {
+  noNotesSubtext: {
     fontSize: 14,
     color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: 16,
   },
-  disasterScrollIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  scrollDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.border,
-    marginHorizontal: 3,
-  },
-  scrollDotActive: {
-    width: 20,
+  uploadButton: {
     backgroundColor: colors.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: colors.textLight,
-    marginTop: 2,
+  uploadButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  // Menu styles
   menuOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1440,243 +1209,229 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    width: '80%',
-    backgroundColor: '#fff',
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    ...shadows.large,
+    width: 280,
+    backgroundColor: colors.background,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
   },
   menuHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 0,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  closeButton: {
+  menuCloseButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  menuTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
   },
   menuItems: {
-    flex: 1,
+    padding: 16,
   },
   menuItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    backgroundColor: 'transparent',
-  },
-  menuItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  menuIconContainer: {
-    width: 44,
-    height: 44,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(255, 0, 0, 0.08)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-    ...shadows.small,
-    transform: [{ perspective: 1000 }, { rotateX: '5deg' }, { rotateY: '5deg' }],
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 0, 0, 0.15)',
-  },
-  menuIcon: {
-    transform: [{ scale: 1.1 }],
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 0.5, height: 0.5 },
-    textShadowRadius: 1,
-    opacity: 0.9,
+    marginBottom: 8,
   },
   menuItemText: {
     fontSize: 16,
     color: colors.text,
-    fontWeight: '500',
+    marginLeft: 12,
   },
-  logoutButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingTop: 16,
+  },
+  statItem: {
+    flex: 1,
+    minWidth: '45%',
+    flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    gap: 12,
   },
-  menuProfileSection: {
-    padding: 20,
-    borderBottomWidth: 0,
-    alignItems: 'center',
+  statContent: {
+    flex: 1,
   },
-  menuProfileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 12,
-  },
-  menuProfilePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  menuProfileText: {
-    fontSize: 18,
+  statValue: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
-  },
-  updatesLoadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  updatesLoadingText: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginTop: 12,
-  },
-  updatesErrorContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  updatesErrorText: {
-    fontSize: 14,
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 32,
-  },
-  noUpdatesContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 32,
-  },
-  noUpdatesIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.success + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-  },
-  noUpdatesText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
     marginBottom: 4,
   },
-  noUpdatesSubtext: {
+  statLabel: {
     fontSize: 14,
     color: colors.textLight,
   },
-  updateCard: {
-    padding: 16,
-    marginBottom: 16,
-    marginTop: 5,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: 'transparent',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  updateIconFloating: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    justifyContent: 'center',
+  statsLoadingContainer: {
+    padding: 24,
     alignItems: 'center',
-    marginRight: 16,
+  },
+  statsLoadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.textLight,
+  },
+  statsErrorContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  statsErrorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: colors.danger,
+    textAlign: 'center',
+  },
+  purchasesContainer: {
+    paddingRight: 16,
+  },
+  purchaseCard: {
+    width: 200,
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    marginRight: 12,
+    padding: 16,
     ...shadows.small,
   },
-  updateContent: {
+  purchaseContent: {
     flex: 1,
   },
-  updateHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  updateTitle: {
+  purchaseTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  severityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  severityText: {
-    fontSize: 12,
     fontWeight: '600',
-  },
-  updateLocation: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  updateDescription: {
-    fontSize: 14,
     color: colors.text,
     marginBottom: 8,
-    lineHeight: 20,
   },
-  updateMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  purchaseMeta: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 4,
   },
-  updateSource: {
-    fontSize: 12,
+  purchaseSeller: {
+    fontSize: 14,
     color: colors.primary,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  updateDate: {
-    fontSize: 12,
+  trendingSection: {
+    marginTop: 24,
+  },
+  trendingContainer: {
+    paddingRight: 16,
+  },
+  trendingCard: {
+    width: Dimensions.get('window').width - 32, // Full width minus padding
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    marginRight: 16,
+    padding: 16,
+    ...shadows.small,
+  },
+  trendingContent: {
+    flex: 1,
+  },
+  trendingTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  trendingDescription: {
+    fontSize: 14,
+    color: colors.textLight,
+    marginBottom: 12,
+  },
+  trendingMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  trendingStats: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  statText: {
+    fontSize: 14,
     color: colors.textLight,
   },
-  weatherInfo: {
-    alignItems: 'flex-end',
+  trendingPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  paginationContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    marginLeft: 'auto',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 8,
   },
-  temperature: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: '#fff',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.border,
   },
-  location: {
+  paginationDotActive: {
+    width: 24,
+    backgroundColor: colors.primary,
+  },
+  emptySection: {
+    padding: 24,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+  },
+  emptySectionText: {
+    marginTop: 12,
     fontSize: 16,
+    color: colors.textLight,
+    textAlign: 'center',
+  },
+  browseButton: {
+    marginTop: 16,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  browseButtonText: {
     color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
-    marginTop: -4,
-    opacity: 0.9,
   },
-  scrollContainer: {
-    flex: 1,
+  loadingContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  scrollView: {
-    flex: 1,
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.textLight,
   },
-  scrollContent: {
-    flexGrow: 1,
+  errorContainer: {
+    padding: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.danger,
+    textAlign: 'center',
   },
 });

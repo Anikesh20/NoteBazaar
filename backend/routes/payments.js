@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const auth = require('../middleware/auth');
 const { confirmPayment, createPaymentIntent } = require('../stripe');
 // const twilio = require('twilio');
 
@@ -12,7 +12,7 @@ const router = express.Router();
 // );
 
 // Create a payment intent
-router.post('/create-payment-intent', authenticateToken, async (req, res) => {
+router.post('/create-payment-intent', auth, async (req, res) => {
   try {
     const { amount } = req.body;
     
@@ -36,10 +36,10 @@ router.post('/create-payment-intent', authenticateToken, async (req, res) => {
 });
 
 // Confirm a payment
-router.post('/confirm-payment', authenticateToken, async (req, res) => {
+router.post('/confirm-payment', auth, async (req, res) => {
   try {
-    const { paymentIntentId, phoneNumber } = req.body;
-    console.log('Payment confirmation request received:', { paymentIntentId, phoneNumber });
+    const { paymentIntentId } = req.body;
+    console.log('Payment confirmation request received:', { paymentIntentId });
     
     if (!paymentIntentId) {
       return res.status(400).json({ error: 'Payment intent ID is required' });
@@ -49,31 +49,9 @@ router.post('/confirm-payment', authenticateToken, async (req, res) => {
     console.log('Payment intent status:', paymentIntent.status);
     
     if (paymentIntent.status === 'succeeded') {
-      // SMS notification temporarily disabled
-      // if (phoneNumber) {
-      //   try {
-      //     console.log('Attempting to send SMS to:', phoneNumber);
-      //     const message = `Thank you for your donation of Rs. ${paymentIntent.amount/100} to Nepal Disaster Management System. Your contribution makes a difference!`;
-      //     const formattedNumber = phoneNumber.startsWith('+') ? phoneNumber : `+977${phoneNumber}`;
-      //     const result = await twilioClient.messages.create({
-      //       body: message,
-      //       to: formattedNumber,
-      //       from: process.env.TWILIO_PHONE_NUMBER,
-      //     });
-      //     console.log('SMS sent successfully:', {
-      //       sid: result.sid,
-      //       status: result.status,
-      //       to: result.to
-      //     });
-      //   } catch (smsError) {
-      //     console.error('Error sending SMS notification:', smsError);
-      //   }
-      // }
-      
       res.json({
         success: true,
-        paymentIntent,
-        notificationSent: false // SMS notifications disabled
+        paymentIntent
       });
     } else {
       console.log('Payment not successful:', paymentIntent.status);
@@ -84,15 +62,8 @@ router.post('/confirm-payment', authenticateToken, async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Payment confirmation error:', {
-      message: error.message,
-      code: error.code,
-      status: error.status
-    });
-    res.status(500).json({ 
-      error: 'Failed to confirm payment',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Error confirming payment:', error);
+    res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
 

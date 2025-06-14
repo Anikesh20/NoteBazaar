@@ -1,11 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import DataTable from '../components/admin/DataTable';
 import adminService, { UserData } from '../services/adminService';
@@ -41,7 +39,60 @@ export default function UsersManagement() {
   const handleViewUser = (user: UserData) => {
     Alert.alert(
       'User Details',
-      `ID: ${user.id}\nName: ${user.full_name}\nEmail: ${user.email}\nPhone: ${user.phone_number}\nDistrict: ${user.district}\nBlood Group: ${user.blood_group || 'Not specified'}\nVolunteer: ${user.is_volunteer ? 'Yes' : 'No'}\nCreated: ${new Date(user.created_at).toLocaleDateString()}`
+      `ID: ${user.id}\nName: ${user.full_name}\nEmail: ${user.email}\nPhone: ${user.phone_number}\nUsername: ${user.username}\nWallet Balance: Rs. ${user.wallet_balance}\nAdmin: ${user.is_admin ? 'Yes' : 'No'}\nCreated: ${new Date(user.created_at).toLocaleDateString()}`
+    );
+  };
+
+  const handleToggleStatus = async (user: UserData) => {
+    Alert.alert(
+      'Change User Status',
+      `Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} this user?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: user.is_active ? 'Deactivate' : 'Activate',
+          onPress: async () => {
+            try {
+              const updatedUser = await adminService.updateUserStatus(user.id, !user.is_active);
+              setUsers(users.map(u => u.id === user.id ? updatedUser : u));
+              Alert.alert('Success', `User has been ${user.is_active ? 'deactivated' : 'activated'}`);
+            } catch (error) {
+              console.error('Error updating user status:', error);
+              Alert.alert('Error', 'Failed to update user status');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteUser = async (user: UserData) => {
+    Alert.alert(
+      'Delete User',
+      'Are you sure you want to delete this user? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await adminService.deleteUser(user.id);
+              setUsers(users.filter(u => u.id !== user.id));
+              Alert.alert('Success', 'User has been deleted');
+            } catch (error) {
+              console.error('Error deleting user:', error);
+              Alert.alert('Error', 'Failed to delete user');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -50,6 +101,11 @@ export default function UsersManagement() {
       id: 'id',
       label: 'ID',
       width: 50,
+    },
+    {
+      id: 'username',
+      label: 'Username',
+      sortable: true,
     },
     {
       id: 'full_name',
@@ -62,23 +118,26 @@ export default function UsersManagement() {
       sortable: true,
     },
     {
-      id: 'district',
-      label: 'District',
+      id: 'wallet_balance',
+      label: 'Balance',
+      render: (item: UserData) => (
+        <Text>Rs. {item.wallet_balance}</Text>
+      ),
       sortable: true,
     },
     {
-      id: 'is_volunteer',
-      label: 'Volunteer',
+      id: 'is_active',
+      label: 'Status',
       render: (item: UserData) => (
         <View style={styles.badgeContainer}>
           <View
             style={[
               styles.badge,
-              { backgroundColor: item.is_volunteer ? '#4CAF50' : '#9E9E9E' },
+              { backgroundColor: item.is_active ? '#4CAF50' : '#9E9E9E' },
             ]}
           >
             <Text style={styles.badgeText}>
-              {item.is_volunteer ? 'Yes' : 'No'}
+              {item.is_active ? 'ACTIVE' : 'INACTIVE'}
             </Text>
           </View>
         </View>
@@ -95,14 +154,34 @@ export default function UsersManagement() {
     },
   ];
 
-  const actions = [
-    {
-      icon: 'eye-outline' as const,
-      label: 'View',
-      onPress: handleViewUser,
-      color: colors.primary,
-    },
-  ];
+  const getActions = (user: UserData) => {
+    const actions = [
+      {
+        icon: 'eye-outline' as const,
+        label: 'View',
+        onPress: handleViewUser,
+        color: colors.primary,
+      },
+      {
+        icon: user.is_active ? 'close-circle-outline' : 'checkmark-circle-outline' as const,
+        label: user.is_active ? 'Deactivate' : 'Activate',
+        onPress: handleToggleStatus,
+        color: user.is_active ? '#F44336' : '#4CAF50',
+      },
+    ];
+
+    // Only show delete action for non-admin users
+    if (!user.is_admin) {
+      actions.push({
+        icon: 'trash-outline' as const,
+        label: 'Delete',
+        onPress: handleDeleteUser,
+        color: '#F44336',
+      });
+    }
+
+    return actions;
+  };
 
   return (
     <View style={styles.container}>
@@ -120,10 +199,10 @@ export default function UsersManagement() {
           isLoading={isLoading}
           onRowPress={handleViewUser}
           searchable
-          searchKeys={['full_name', 'email', 'username', 'district']}
+          searchKeys={['username', 'full_name', 'email']}
           refreshing={refreshing}
           onRefresh={handleRefresh}
-          actions={actions}
+          actions={users.length > 0 ? getActions(users[0]) : []}
           emptyMessage="No users found"
         />
       </View>

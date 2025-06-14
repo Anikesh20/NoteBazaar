@@ -1,23 +1,53 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+require('dotenv').config();
 
+// Create a new pool using the connection string
 const pool = new Pool({
-    connectionString: 'postgresql://neondb_owner:npg_m8KwGUQuLOz7@ep-cold-union-a47hx6do-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require',
+    connectionString: 'postgresql://neondb_owner:npg_jRcdvz2u0koq@ep-solitary-union-a8pwjqoc-pooler.eastus2.azure.neon.tech/neondb?sslmode=require',
     ssl: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false // Required for Neon DB
     }
 });
 
 // Test the connection
 pool.connect((err, client, release) => {
     if (err) {
-        console.error('Error connecting to the database:', err);
-        return;
+        console.error('Error connecting to the database:', err.stack);
+    } else {
+        console.log('Successfully connected to Neon PostgreSQL database');
+        release();
     }
-    console.log('Successfully connected to the database');
-    release();
 });
+
+// Helper function to get a client from the pool
+pool.getClient = async () => {
+    const client = await pool.connect();
+    const query = client.query;
+    const release = client.release;
+
+    // Set a timeout of 5 seconds, after which we will log this client's last query
+    const timeout = setTimeout(() => {
+        console.error('A client has been checked out for more than 5 seconds!');
+        console.error(`The last executed query on this client was: ${client.lastQuery}`);
+    }, 5000);
+
+    // Monkey patch the query method to keep track of the last query executed
+    client.query = (...args) => {
+        client.lastQuery = args;
+        return query.apply(client, args);
+    };
+
+    client.release = () => {
+        clearTimeout(timeout);
+        client.query = query;
+        client.release = release;
+        return release.apply(client);
+    };
+
+    return client;
+};
 
 // This function should only be called manually when you need to reset/initialize the database
 async function resetDatabase() {
@@ -33,17 +63,8 @@ async function resetDatabase() {
 }
 
 module.exports = {
-    query: async (text, params) => {
-        try {
-            console.log('Executing query:', text);
-            console.log('With parameters:', params);
-            const result = await pool.query(text, params);
-            return result;
-        } catch (error) {
-            console.error('Database query error:', error);
-            throw error;
-        }
-    },
-    pool: pool,
+    query: (text, params) => pool.query(text, params),
+    getClient: () => pool.getClient(),
+    pool,
     resetDatabase: resetDatabase  // Renamed from initializeDatabase to make its purpose clearer
 }; 

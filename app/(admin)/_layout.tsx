@@ -51,7 +51,7 @@ export default function AdminLayout() {
       // Navigate to login screen
       router.replace('/(auth)/LoginScreen');
     } catch (error) {
-      console.error('Error during admin logout:', error);
+      console.error('Error during logout:', error);
     }
   };
 
@@ -62,8 +62,6 @@ export default function AdminLayout() {
       </View>
     );
   }
-
-
 
   return (
     <>
@@ -114,30 +112,6 @@ export default function AdminLayout() {
             title: 'User Management',
           }}
         />
-        <Stack.Screen
-          name="disasters"
-          options={{
-            title: 'Disaster Management',
-          }}
-        />
-        <Stack.Screen
-          name="reports"
-          options={{
-            title: 'Report Management',
-          }}
-        />
-        <Stack.Screen
-          name="donations"
-          options={{
-            title: 'Donation Management',
-          }}
-        />
-        <Stack.Screen
-          name="volunteers"
-          options={{
-            title: 'Volunteer Management',
-          }}
-        />
       </Stack>
     </>
   );
@@ -150,8 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutButton: {
-    padding: 8,
-    marginRight: 8,
+    marginRight: 16,
   },
   logoutButtonContent: {
     flexDirection: 'row',
@@ -159,10 +132,10 @@ const styles = StyleSheet.create({
   },
   logoutButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 4,
+    marginLeft: 8,
+    fontSize: 16,
   },
   backButton: {
-    padding: 8,
+    marginLeft: 16,
   },
 });

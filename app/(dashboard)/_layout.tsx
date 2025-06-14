@@ -1,15 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import * as Haptics from 'expo-haptics';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { BackHandler, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../hooks/useAuth';
 import { logout } from '../services/authService';
 import { colors } from '../styles/theme';
 
 export default function DashboardLayout() {
+  const { user } = useAuth();
   const router = useRouter();
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
 
   useEffect(() => {
     const hideNavigationBar = async () => {
@@ -48,90 +51,86 @@ export default function DashboardLayout() {
   // Get the status bar height
   const statusBarHeight = Constants.statusBarHeight;
 
+  // Handle back button press only on Android
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = {
+        removeEventListener: () => {},
+        addEventListener: (eventName: string, handler: () => boolean) => {
+          if (eventName === 'hardwareBackPress') {
+            const subscription = BackHandler.addEventListener(eventName, () => {
+              if (isMenuVisible) {
+                setIsMenuVisible(false);
+                return true;
+              }
+              return false;
+            });
+            return { remove: () => subscription.remove() };
+          }
+          return { remove: () => {} };
+        },
+      };
+
+      const subscription = backHandler.addEventListener('hardwareBackPress', () => {
+        if (isMenuVisible) {
+          setIsMenuVisible(false);
+          return true;
+        }
+        return false;
+      });
+
+      return () => subscription.remove();
+    }
+  }, [isMenuVisible]);
+
+  // Custom header component
+  const CustomHeader = ({ route, options }: any) => {
+    const showHeader = route.name !== 'index';
+    const title = options.title || route.name;
+
+    if (!showHeader) return null;
+
+    return (
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => {
+            if (route.name === 'index') {
+              setIsMenuVisible(true);
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.headerButton}
+        >
+          <Ionicons
+            name={route.name === 'index' ? 'menu-outline' : 'arrow-back'}
+            size={24}
+            color={colors.text}
+          />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{title}</Text>
+        {route.name === 'index' && (
+          <TouchableOpacity
+            onPress={() => router.push('/dashboard/upload')}
+            style={styles.headerButton}
+          >
+            <Ionicons name="add-circle-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
   return (
-    <>
-      <StatusBar style="dark" />
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar style="auto" />
       <Stack
         screenOptions={{
-          headerShown: true,
-          header: ({ navigation, route, options }) => {
-            // Don't show header on the main dashboard screen
-            if (route.name === 'index') {
-              return null;
-            }
-
-            // Special header for weather screen with refresh button
-            if (route.name === 'weather') {
-              return (
-                <View style={[styles.headerContainer, { paddingTop: statusBarHeight + 10 }]}>
-                  <View style={styles.header}>
-                    <TouchableOpacity
-                      style={styles.backButton}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        navigation.goBack();
-                      }}
-                    >
-                      <Ionicons name="arrow-back" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{options.title || route.name}</Text>
-                    <TouchableOpacity
-                      style={styles.refreshButton}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        // Trigger refresh through navigation params
-                        navigation.setParams({ refresh: Date.now() });
-                      }}
-                    >
-                      <Ionicons name="refresh" size={24} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            }
-
-            // Default header for other screens
-            return (
-              <View style={[styles.headerContainer, { paddingTop: statusBarHeight + 10 }]}>
-                <View style={styles.header}>
-                  <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      navigation.goBack();
-                    }}
-                  >
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.headerTitle}>{options.title || route.name}</Text>
-                  {route.name === 'my-reports' && (
-                    <TouchableOpacity
-                      style={styles.headerRightButton}
-                      onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        navigation.navigate('report-disaster');
-                      }}
-                    >
-                      <Ionicons name="add" size={24} color={colors.primary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            );
-          },
-          headerStyle: {
+          header: (props) => <CustomHeader {...props} />,
+          contentStyle: { 
             backgroundColor: colors.background,
-            height: Platform.OS === 'ios' ? 120 : 100,
-            elevation: 0,
-            shadowOpacity: 0,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
+            flex: 1,
           },
-          contentStyle: {
-            backgroundColor: colors.background,
-            paddingTop: Platform.OS === 'ios' ? 0 : 10, // Add padding for Android
-          },
-          headerStatusBarHeight: Platform.OS === 'ios' ? 0 : statusBarHeight, // Adjust status bar height
         }}
       >
         <Stack.Screen
@@ -153,101 +152,55 @@ export default function DashboardLayout() {
           }}
         />
         <Stack.Screen
-          name="report-disaster"
+          name="my-notes"
           options={{
-            title: 'Report a Disaster',
+            title: 'My Notes',
           }}
         />
         <Stack.Screen
-          name="volunteer-status"
+          name="browse"
           options={{
-            title: 'Volunteer Status',
+            title: 'Browse Notes',
           }}
         />
         <Stack.Screen
-          name="all-actions"
+          name="upload"
           options={{
-            title: 'All Actions',
+            title: 'Upload Note',
           }}
         />
         <Stack.Screen
-          name="emergency-contacts"
+          name="note-details"
           options={{
-            title: 'Emergency Contacts',
-          }}
-        />
-        <Stack.Screen
-          name="disaster-map"
-          options={{
-            title: 'Disaster Map',
-          }}
-        />
-        <Stack.Screen
-          name="historical-data"
-          options={{
-            title: 'Historical Data',
-          }}
-        />
-        <Stack.Screen
-          name="my-reports"
-          options={{
-            title: 'My Reports',
-          }}
-        />
-        <Stack.Screen
-          name="disaster-details"
-          options={{
-            title: 'Disaster Details',
-          }}
-        />
-        <Stack.Screen
-          name="weather"
-          options={{
-            title: 'Weather',
-          }}
-        />
-        <Stack.Screen
-          name="safety-tips"
-          options={{
-            title: 'Safety Tips',
+            title: 'Note Details',
           }}
         />
       </Stack>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
+  safeArea: {
+    flex: 1,
     backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    zIndex: 1, // Ensure header stays on top
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
     paddingHorizontal: 16,
-    marginTop: 10,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  backButton: {
-    width: 44, // Slightly larger touch target
-    height: 44, // Slightly larger touch target
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
+  headerButton: {
+    padding: 8,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginLeft: 16,
     color: colors.text,
-  },
-  refreshButton: {
-    padding: 8,
-  },
-  headerRightButton: {
-    padding: 8,
-    marginLeft: 'auto',
   },
 });

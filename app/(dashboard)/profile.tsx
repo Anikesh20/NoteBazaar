@@ -5,7 +5,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { getUserProfile, updateUserProfile } from '../services/userService';
 import { colors } from '../styles/theme';
 
 export default function ProfileScreen() {

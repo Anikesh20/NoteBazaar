@@ -82,40 +82,12 @@ export default function AdminDashboard() {
       color: '#3498DB',
       description: 'Manage user accounts and profiles',
       onPress: () => router.push('/(admin)/users'),
-    },
-    {
-      title: 'Disaster Management',
-      icon: 'warning',
-      color: '#E74C3C',
-      description: 'Manage active and historical disasters',
-      onPress: () => router.push('/(admin)/disasters'),
-    },
-    {
-      title: 'Report Management',
-      icon: 'document-text',
-      color: '#F39C12',
-      description: 'Review and verify user-submitted reports',
-      onPress: () => router.push('/(admin)/reports'),
-    },
-    {
-      title: 'Donation Management',
-      icon: 'cash',
-      color: '#2ECC71',
-      description: 'Track donations and campaigns',
-      onPress: () => router.push('/(admin)/donations'),
-    },
-    {
-      title: 'Volunteer Management',
-      icon: 'people-circle',
-      color: '#9B59B6',
-      description: 'Manage volunteer registrations and assignments',
-      onPress: () => router.push('/(admin)/volunteers'),
-    },
+    }
   ];
 
   return (
     <ScrollView
-      style={[styles.container, { marginTop: 10 }]} // Add top margin to avoid status bar overlap
+      style={[styles.container, { marginTop: 10 }]}
       contentContainerStyle={styles.contentContainer}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
@@ -123,7 +95,7 @@ export default function AdminDashboard() {
     >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Admin Dashboard</Text>
-        <Text style={styles.headerSubtitle}>Nepal Disaster Management</Text>
+        <Text style={styles.headerSubtitle}>NoteBazaar Administration</Text>
       </View>
 
       <View style={styles.statsContainer}>
@@ -137,50 +109,12 @@ export default function AdminDashboard() {
             onPress={() => router.push('/(admin)/users')}
           />
           <StatsCard
-            title="Total Volunteers"
-            value={stats?.totalVolunteers || 0}
-            icon="people-circle"
-            color="#9B59B6"
-            isLoading={isLoading}
-            onPress={() => router.push('/(admin)/volunteers')}
-          />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatsCard
-            title="Active Disasters"
-            value={stats?.activeDisasters || 0}
-            icon="warning"
-            color="#E74C3C"
-            isLoading={isLoading}
-            onPress={() => router.push('/(admin)/disasters')}
-          />
-          <StatsCard
-            title="Pending Reports"
-            value={stats?.pendingReports || 0}
+            title="Active Notes"
+            value={stats?.activeNotes || 0}
             icon="document-text"
-            color="#F39C12"
-            isLoading={isLoading}
-            onPress={() => router.push('/(admin)/reports')}
-          />
-        </View>
-
-        <View style={styles.statsRow}>
-          <StatsCard
-            title="Total Donations"
-            value={stats?.totalDonations || 0}
-            icon="cash"
             color="#2ECC71"
             isLoading={isLoading}
-            onPress={() => router.push('/(admin)/donations')}
-          />
-          <StatsCard
-            title="Donation Amount"
-            value={`Rs. ${stats?.totalDonationAmount || 0}`}
-            icon="wallet"
-            color="#1ABC9C"
-            isLoading={isLoading}
-            onPress={() => router.push('/(admin)/donations')}
+            onPress={() => router.push('/(admin)/notes')}
           />
         </View>
       </View>
